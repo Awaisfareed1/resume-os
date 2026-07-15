@@ -1,12 +1,15 @@
-import { IsEmail, IsOptional, IsString } from 'class-validator';
+import {
+  IsEmail,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class CreateCandidateDto {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
   @IsString()
-  firstName!: string;
+  firstName: string;
 
   @IsString()
-  lastName!: string;
+  lastName: string;
 
   @IsOptional()
   @IsEmail()

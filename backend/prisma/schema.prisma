@@ -6,3 +6,99 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+enum ApplicationStatus {
+  DRAFT
+  APPLIED
+  INTERVIEW
+  SHORTLISTED
+  OFFER
+  REJECTED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  candidates Candidate[]
+}
+
+model Candidate {
+  id        String  @id @default(uuid())
+  firstName String
+  lastName  String
+  email     String?
+  phone     String?
+  country   String?
+  notes     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  profiles Profile[]
+  user     User?     @relation(fields: [userId], references: [id])
+  userId   String?
+}
+
+model Profile {
+  id String @id @default(uuid())
+
+  title   String
+  summary String?
+
+  knowledge Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  resumeVersions ResumeVersion[]
+
+  @@index([candidateId])
+}
+
+model ResumeVersion {
+  id String @id @default(uuid())
+
+  company        String
+  jobTitle       String
+  jobDescription String @db.Text
+
+  resumeJson Json
+
+  atsScore Float?
+
+  createdAt DateTime @default(now())
+
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  applications Application[]
+
+  @@index([profileId])
+}
+
+model Application {
+  id String @id @default(uuid())
+
+  platform String
+  jobUrl   String?
+
+  status ApplicationStatus @default(DRAFT)
+
+  notes String?
+
+  appliedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  resumeVersionId String
+  resumeVersion   ResumeVersion @relation(fields: [resumeVersionId], references: [id], onDelete: Cascade)
+
+  @@index([resumeVersionId])
+}

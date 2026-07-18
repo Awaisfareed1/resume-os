@@ -7,98 +7,552 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum ApplicationStatus {
+enum Role {
+  SUPER_ADMIN
+  USER
+  BIDDER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum BidderStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ProfileStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  FREELANCE
+  INTERN
+  TEMPORARY
+  OTHER
+}
+
+enum LocationType {
+  ONSITE
+  REMOTE
+  HYBRID
+}
+
+enum JobStatus {
   DRAFT
-  APPLIED
-  INTERVIEW
-  SHORTLISTED
-  OFFER
+  IN_PROGRESS
+  COMPLETED
+  ARCHIVED
+}
+
+enum ResumeStatus {
+  DRAFT
+  GENERATED
+  REVIEWED
+  APPROVED
   REJECTED
 }
 
-model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  candidates Candidate[]
+enum CoverLetterStatus {
+  DRAFT
+  GENERATED
+  REVIEWED
+  APPROVED
+  REJECTED
 }
 
-model Candidate {
-  id        String  @id @default(uuid())
-  firstName String
-  lastName  String
-  email     String?
-  phone     String?
-  country   String?
-  notes     String?
+enum AssetType {
+  RESUME
+  COVER_LETTER
+  IMAGE
+  DOCUMENT
+  OTHER
+}
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+enum AssetFormat {
+  PDF
+  DOCX
+  HTML
+  JSON
+  PNG
+  JPG
+  JPEG
+  TXT
+  OTHER
+}
 
-  profiles Profile[]
-  user     User?     @relation(fields: [userId], references: [id])
-  userId   String?
+enum AIAction {
+  GENERATE_RESUME
+  GENERATE_COVER_LETTER
+  OPTIMIZE_RESUME
+  IMPROVE_BULLETS
+  GENERATE_SUMMARY
+  OTHER
+}
+
+model User {
+  id String @id @default(cuid())
+
+  companyName String
+  firstName   String
+  lastName    String
+
+  email        String @unique
+  passwordHash String
+
+  phone    String?
+  country  String?
+  timezone String?
+
+  role   Role       @default(USER)
+  status UserStatus @default(ACTIVE)
+
+  bidders     Bidder[]
+  profiles    Profile[]
+  aiUsageLogs AIUsageLog[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("users")
+}
+
+model Bidder {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  firstName   String
+  lastName    String
+  displayName String?
+
+  email        String
+  passwordHash String
+
+  avatar String?
+
+  status BidderStatus @default(ACTIVE)
+
+  lastLogin DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([userId, email])
+  @@index([userId])
+  @@map("bidders")
 }
 
 model Profile {
-  id String @id @default(uuid())
+  id String @id @default(cuid())
 
-  title   String
-  summary String?
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  knowledge Json
+  firstName String
+  lastName  String
+
+  email String?
+  phone String?
+
+  country String?
+  city    String?
+
+  linkedinUrl  String?
+  portfolioUrl String?
+
+  notes String?
+
+  status ProfileStatus @default(ACTIVE)
+
+  masterResume MasterResume?
+
+  jobs        Job[]
+  aiusageLogs AIUsageLog[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([userId])
+  @@index([lastName])
+  @@map("profiles")
+}
+
+model MasterResume {
+  id String @id @default(cuid())
+
+  profileId String  @unique
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  headline            String?
+  professionalSummary String? @db.Text
+
+  version Int @default(1)
+
+  experiences Experience[]
+  educations  Education[]
+  skills      Skill[]
+  projects    Project[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([profileId])
+  @@map("master_resumes")
+}
+
+model Experience {
+  id String @id @default(cuid())
+
+  masterResumeId String
+  masterResume   MasterResume @relation(fields: [masterResumeId], references: [id], onDelete: Cascade)
+
+  companyName String
+  jobTitle    String
+
+  employmentType EmploymentType?
+
+  locationType LocationType?
+
+  location String?
+
+  startDate DateTime
+  endDate   DateTime?
+
+  isCurrent Boolean @default(false)
+
+  summary String? @db.Text
+
+  displayOrder Int @default(0)
+
+  bullets ExperienceBullet[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([masterResumeId])
+  @@index([companyName])
+  @@index([jobTitle])
+  @@map("experiences")
+}
+
+model ExperienceBullet {
+  id String @id @default(cuid())
+
+  experienceId String
+  experience   Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+
+  description String @db.Text
+
+  displayOrder Int @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  candidateId String
-  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-
-  resumeVersions ResumeVersion[]
-
-  @@index([candidateId])
+  @@index([experienceId])
+  @@map("experience_bullets")
 }
 
-model ResumeVersion {
-  id String @id @default(uuid())
+model Education {
+  id String @id @default(cuid())
 
-  company        String
-  jobTitle       String
-  jobDescription String @db.Text
+  masterResumeId String
+  masterResume   MasterResume @relation(fields: [masterResumeId], references: [id], onDelete: Cascade)
 
-  resumeJson Json
+  institution String
+  degree      String
 
-  atsScore Float?
+  fieldOfStudy String?
 
-  createdAt DateTime @default(now())
+  grade String?
+
+  startDate DateTime?
+  endDate   DateTime?
+
+  isCurrent Boolean @default(false)
+
+  description String? @db.Text
+
+  displayOrder Int @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([masterResumeId])
+  @@index([institution])
+  @@map("educations")
+}
+
+enum SkillCategory {
+  PROGRAMMING_LANGUAGE
+  FRAMEWORK
+  LIBRARY
+  DATABASE
+  CLOUD
+  DEVOPS
+  TOOL
+  OPERATING_SYSTEM
+  TESTING
+  SOFT_SKILL
+  LANGUAGE
+  OTHER
+}
+
+model Skill {
+  id String @id @default(cuid())
+
+  masterResumeId String
+  masterResume   MasterResume @relation(fields: [masterResumeId], references: [id], onDelete: Cascade)
+
+  name String
+
+  category SkillCategory @default(OTHER)
+
+  proficiency Int?
+
+  yearsExperience Decimal? @db.Decimal(4, 1)
+
+  lastUsedYear Int?
+
+  displayOrder Int @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([masterResumeId])
+  @@index([category])
+  @@index([name])
+  @@map("skills")
+}
+
+model Project {
+  id String @id @default(cuid())
+
+  masterResumeId String
+  masterResume   MasterResume @relation(fields: [masterResumeId], references: [id], onDelete: Cascade)
+
+  title String
+
+  role String?
+
+  organization String?
+
+  description String? @db.Text
+
+  technologies String? @db.Text
+
+  projectUrl String?
+
+  repositoryUrl String?
+
+  startDate DateTime?
+
+  endDate DateTime?
+
+  isCurrent Boolean @default(false)
+
+  displayOrder Int @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([masterResumeId])
+  @@index([title])
+  @@map("projects")
+}
+
+model Job {
+  id String @id @default(cuid())
 
   profileId String
   profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
-  applications Application[]
+  companyName String
+  jobTitle    String
 
-  @@index([profileId])
-}
+  location String?
 
-model Application {
-  id String @id @default(uuid())
+  employmentType EmploymentType?
 
-  platform String
-  jobUrl   String?
+  jobUrl String?
 
-  status ApplicationStatus @default(DRAFT)
+  salary String?
 
-  notes String?
+  description String @db.Text
+
+  atsScore Decimal? @db.Decimal(5, 2)
+
+  status JobStatus @default(DRAFT)
 
   appliedAt DateTime?
+  deadline  DateTime?
+
+  notes String? @db.Text
+
+  generatedResumes GeneratedResume[]
+  coverLetters     CoverLetter[]
+  aiusageLogs      AIUsageLog[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([profileId])
+  @@index([companyName])
+  @@index([jobTitle])
+  @@index([status])
+  @@map("jobs")
+}
+
+model GeneratedResume {
+  id String @id @default(cuid())
+
+  jobId String
+  job   Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  version Int @default(1)
+
+  title String?
+
+  atsScore Decimal? @db.Decimal(5, 2)
+
+  htmlContent String? @db.Text
+
+  jsonContent Json?
+
+  status ResumeStatus @default(DRAFT)
+
+  isFinal Boolean @default(false)
+
+  assets Asset[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([jobId, version])
+  @@index([jobId])
+  @@index([status])
+  @@map("generated_resumes")
+}
+
+model Asset {
+  id String @id @default(cuid())
+
+  generatedResumeId String?
+  generatedResume   GeneratedResume? @relation(fields: [generatedResumeId], references: [id], onDelete: Cascade)
+
+  coverLetterId String?
+  coverLetter   CoverLetter? @relation(fields: [coverLetterId], references: [id], onDelete: Cascade)
+
+  type AssetType
+
+  format AssetFormat
+
+  fileName String
+
+  originalFileName String?
+
+  mimeType String?
+
+  fileSize Int?
+
+  storageKey String
+
+  publicUrl String?
+
+  checksum String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([generatedResumeId])
+  @@index([type])
+  @@index([format])
+  @@index([coverLetterId])
+  @@map("assets")
+}
+
+model CoverLetter {
+  id String @id @default(cuid())
+
+  jobId String
+  job   Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  version Int @default(1)
+
+  title String?
+
+  content String? @db.Text
+
+  jsonContent Json?
+
+  status CoverLetterStatus @default(DRAFT)
+
+  isFinal Boolean @default(false)
+
+  assets Asset[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([jobId, version])
+  @@index([jobId])
+  @@index([status])
+  @@map("cover_letters")
+}
+
+model AIUsageLog {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  profileId String?
+  profile   Profile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+
+  jobId String?
+  job   Job?    @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  action AIAction
+
+  model String
+
+  promptTokens     Int?
+  completionTokens Int?
+  totalTokens      Int?
+
+  estimatedCost Decimal? @db.Decimal(10, 4)
+
+  durationMs Int?
+
+  success Boolean @default(true)
+
+  errorMessage String? @db.Text
 
   createdAt DateTime @default(now())
 
-  resumeVersionId String
-  resumeVersion   ResumeVersion @relation(fields: [resumeVersionId], references: [id], onDelete: Cascade)
-
-  @@index([resumeVersionId])
+  @@index([userId])
+  @@index([profileId])
+  @@index([jobId])
+  @@index([action])
+  @@map("ai_usage_logs")
 }

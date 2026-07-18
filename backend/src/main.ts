@@ -20,6 +20,14 @@ async function bootstrap() {
     .setTitle('ResumeOS API')
     .setDescription('ResumeOS Backend API Documentation')
     .setVersion('1.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+      },
+      'JWT-auth',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
